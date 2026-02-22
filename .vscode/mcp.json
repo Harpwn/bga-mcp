@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "bga-mcp-server": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${workspaceFolder}/dist/index.js"],
+      "env": {
+        "BGA_WORKSPACE_PATH": "${workspaceFolder}"
+      }
+    }
+  }
+}
