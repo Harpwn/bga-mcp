@@ -18,9 +18,11 @@ Provides AI assistants with tools to:
 ```
 src/
   index.ts          - MCP server entry point
+  config.ts         - Central configuration (WORKSPACE_PATH, BGA_WIKI_API, BGA_DOC_PAGES, etc.)
   tools/
     docs.ts         - BGA wiki documentation tools
     scaffold.ts     - Code generation / scaffolding tools (State classes)
+    validate.ts     - Project linting / validation
     migrate.ts      - Migration tools (legacy → State classes)
     project.ts      - Local game project file tools
 ```

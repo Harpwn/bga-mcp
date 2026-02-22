@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-const WORKSPACE_PATH = process.env.BGA_WORKSPACE_PATH;
+import { WORKSPACE_PATH } from "../config.js";
 // ---------------------------------------------------------------------------
 // Shared path resolution (mirrors project.ts)
 // ---------------------------------------------------------------------------

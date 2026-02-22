@@ -1,8 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-
-const WORKSPACE_PATH = process.env.BGA_WORKSPACE_PATH;
+import { WORKSPACE_PATH } from "../config.js";
 
 // ---- Game discovery -------------------------------------------------------
 

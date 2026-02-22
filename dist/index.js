@@ -6,6 +6,7 @@ import { docTools, handleDocTool } from "./tools/docs.js";
 import { scaffoldTools, handleScaffoldTool } from "./tools/scaffold.js";
 import { projectTools, handleProjectTool } from "./tools/project.js";
 import { migrateTools, handleMigrateTool } from "./tools/migrate.js";
+import { validateTools, handleValidateTool } from "./tools/validate.js";
 const server = new Server({
     name: "bga-mcp-server",
     version: "0.1.0",
@@ -21,6 +22,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         ...scaffoldTools,
         ...projectTools,
         ...migrateTools,
+        ...validateTools,
     ],
 }));
 // Route tool calls to the appropriate handler
@@ -37,6 +39,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
     if (migrateTools.find((t) => t.name === name)) {
         return handleMigrateTool(name, args ?? {});
+    }
+    if (validateTools.find((t) => t.name === name)) {
+        return handleValidateTool(name, args ?? {});
     }
     return {
         content: [{ type: "text", text: `Unknown tool: ${name}` }],

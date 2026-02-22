@@ -8,6 +8,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) server that gives A
 |----------|-------|
 | **Documentation** | Search BGA Studio wiki, fetch specific wiki pages |
 | **Scaffolding** | Generate State classes, actions, notifications, full game skeleton |
+| **Validation** | Lint a project for broken transitions, missing zombie(), JS↔PHP action mismatches, and more |
 | **Migration** | Scan projects for deprecated patterns, convert states.inc.php, migration guide |
 | **Local Project** | List files, read files, analyze states.inc.php, list player actions |
 
@@ -53,6 +54,12 @@ npm run inspector
 - **`bga_generate_notification`** – Generate PHP (backend) + JS (frontend) notification stubs using `bgaSetupPromiseNotifications`
 - **`bga_scaffold_game`** – Generate a complete BGA game skeleton using the modern State classes approach
 
+### Validation
+- **`bga_validate_project`** – Lint a project for common bugs and inconsistencies:
+  - 🔴 **Errors**: broken transition targets, duplicate state IDs, filename/classname mismatches, missing `PossibleAction` import, `bgaPerformAction` calls with no matching PHP method
+  - 🟡 **Warnings**: unreachable states, missing `zombie()` on player states, PHP notifications with no JS handler
+  - 🔵 **Info**: stubbed `getGameProgression()`, PHP actions with no JS caller, JS notification handlers with no PHP sender
+
 ### Migration
 - **`bga_migration_status`** – Scan a local project and report which files still use deprecated patterns (states.inc.php, self::checkAction, ajaxcall, notifqueue) vs the modern State classes approach
 - **`bga_convert_states_inc`** – Read an existing `states.inc.php` and generate a modern PHP State class stub for every state in it
@@ -75,9 +82,11 @@ npm run inspector
 ```
 src/
   index.ts          Entry point – sets up MCP server and routes tool calls
+  config.ts         Central configuration – edit this to customise the server
   tools/
     docs.ts         BGA wiki documentation tools
     scaffold.ts     Code generation / scaffolding tools (State classes)
+    validate.ts     Project linting / validation
     migrate.ts      Migration tools (legacy → State classes)
     project.ts      Local game project file tools
 ```

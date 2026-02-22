@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-const WORKSPACE_PATH = process.env.BGA_WORKSPACE_PATH;
+import { WORKSPACE_PATH } from "../config.js";
 // ---- Game discovery -------------------------------------------------------
 /** Returns names of subdirectories that look like BGA game projects. */
 function discoverGames(workspacePath) {

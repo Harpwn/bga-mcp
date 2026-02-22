@@ -11,6 +11,7 @@ import { docTools, handleDocTool } from "./tools/docs.js";
 import { scaffoldTools, handleScaffoldTool } from "./tools/scaffold.js";
 import { projectTools, handleProjectTool } from "./tools/project.js";
 import { migrateTools, handleMigrateTool } from "./tools/migrate.js";
+import { validateTools, handleValidateTool } from "./tools/validate.js";
 
 const server = new Server(
   {
@@ -31,6 +32,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     ...scaffoldTools,
     ...projectTools,
     ...migrateTools,
+    ...validateTools,
   ],
 }));
 
@@ -49,6 +51,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
   if (migrateTools.find((t: Tool) => t.name === name)) {
     return handleMigrateTool(name, args ?? {});
+  }
+  if (validateTools.find((t: Tool) => t.name === name)) {
+    return handleValidateTool(name, args ?? {});
   }
 
   return {
