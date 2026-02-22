@@ -5,8 +5,17 @@
       "command": "node",
       "args": ["${workspaceFolder}/dist/index.js"],
       "env": {
-        "BGA_WORKSPACE_PATH": "${workspaceFolder}"
+        "BGA_WORKSPACE_PATH": "${workspaceFolder}",
+        "BGG_API_TOKEN": "${input:bggApiToken}"
       }
     }
-  }
+  },
+  "inputs": [
+    {
+      "id": "bggApiToken",
+      "type": "promptString",
+      "description": "BoardGameGeek API Bearer token (register at https://boardgamegeek.com/applications)",
+      "password": true
+    }
+  ]
 }

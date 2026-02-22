@@ -1,0 +1,34 @@
+# Node
+node_modules/
+
+# Build outputs
+dist/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# MCP server
+.env
+
+# VS Code
+.vscode/
+
+# Misc
+*.swp
+*.swo
+
+# Test files
+test-bgg.mjs
+
+# SFTP
+.sftp.json
+
+# TypeScript
+*.tsbuildinfo
+
+# Ignore local config
+*.local

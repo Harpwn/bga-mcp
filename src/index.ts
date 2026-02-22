@@ -12,6 +12,7 @@ import { scaffoldTools, handleScaffoldTool } from "./tools/scaffold.js";
 import { projectTools, handleProjectTool } from "./tools/project.js";
 import { migrateTools, handleMigrateTool } from "./tools/migrate.js";
 import { validateTools, handleValidateTool } from "./tools/validate.js";
+import { bggTools, handleBggTool } from "./tools/bgg.js";
 
 const server = new Server(
   {
@@ -33,6 +34,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     ...projectTools,
     ...migrateTools,
     ...validateTools,
+    ...bggTools,
   ],
 }));
 
@@ -54,6 +56,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
   if (validateTools.find((t: Tool) => t.name === name)) {
     return handleValidateTool(name, args ?? {});
+  }
+  if (bggTools.find((t: Tool) => t.name === name)) {
+    return handleBggTool(name, args ?? {});
   }
 
   return {
