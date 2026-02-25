@@ -505,76 +505,227 @@ export const BGA_DOC_PAGES: DocPage[] = [
     alias: "studio_start",
     wikiPage: "First_steps_with_BGA_Studio",
     description:
-      "First steps with BGA Studio — environment setup and first run",
+      "First steps with BGA Studio — getting your local environment connected and making your first change. " +
+      "SFTP setup: configure an SFTP client (FileZilla, WinSCP, or VS Code SFTP extension) to sync files to boardgamearena.com/studio. " +
+      "Creating a project: use Express Start (recommended) or manually create a game from the Control Panel. " +
+      "File structure overview: which files are auto-generated vs hand-edited. " +
+      "Editing workflow: edit locally → SFTP upload → Ctrl+F5 (CSS/images) or F5 (JS/PHP) to reload. " +
+      "Version control: all source files belong under git; .gitignore what shouldn't be committed (node_modules, dist). " +
+      "Common first-run pitfalls: blank white screen (JS/PHP syntax error — check Studio error log), " +
+      "cache not clearing (Ctrl+Shift+R / hard reload), SFTP not uploading (check remote path, permissions, passive mode). " +
+      "Studio URL: en.boardgamearena.com/studio",
     category: "Studio Guide",
   },
   {
     alias: "walkthrough",
     wikiPage: "Create_a_game_in_BGA_Studio:_Complete_Walkthrough",
     description:
-      "Complete walkthrough: creating a game from scratch in BGA Studio",
+      "Complete walkthrough: creating a game from scratch in BGA Studio, step by step. " +
+      "Covers: (1) registering the game and creating the Studio project, " +
+      "(2) adding board/card graphics to img/, (3) writing dbmodel.sql schema, " +
+      "(4) setupNewGame() initialising players/deck/tokens and returning the first State class, " +
+      "(5) getAllDatas() returning everything the client needs for a full page rebuild, " +
+      "(6) defining State classes in modules/php/States/ with getArgs/onEnteringState/act* methods, " +
+      "(7) sending notifications from PHP with notifyAllPlayers/notifyPlayer, " +
+      "(8) handling notif_* in Game.js and updating the DOM, " +
+      "(9) building the initial board DOM in JS setup() from gamedatas, " +
+      "(10) JS State classes for action buttons and client state management, " +
+      "(11) zombie() method for disconnected players, (12) getGameProgression(), " +
+      "(13) testing with 1-player mode and the Studio debug menu, " +
+      "(14) preparing the game for alpha submission. " +
+      "Recommended approach: get one complete move working end-to-end before adding further states",
     category: "Studio Guide",
   },
   {
     alias: "tutorial_reversi",
     wikiPage: "Tutorial_reversi",
     description:
-      "Tutorial: Reversi — recommended beginner tutorial maintained by BGA team",
+      "Tutorial: Reversi — the official BGA beginner tutorial, maintained by the BGA team. " +
+      "Implements a complete 2-player Reversi (Othello) game demonstrating the full modern stack. " +
+      "Board: HTML grid generated in JS setup() from gamedatas.board, CSS for square layout and token colours. " +
+      "PHP: PlayDisc State class with actPlayDisc() validating the move and flipping opponent tokens in DB; " +
+      "NextPlayer State class checking for valid moves and advancing or ending the game; " +
+      "notifyAllPlayers for board updates (notif_playDisc) and score changes (notif_newScores). " +
+      "State machine: ST_PLAYER_TURN → ST_NEXT_PLAYER → loop, plus ST_END_GAME. " +
+      "JS: notif_playDisc handler places the new token and animates flipped tokens with bga-animations slideAndAttach; " +
+      "notif_newScores updates ebg.counter score displays. " +
+      "JS State class: onEnteringState highlights valid target squares; addActionButton for pass when no moves available. " +
+      "Zombie mode: zombieTurn() auto-passes for a disconnected player. " +
+      "Highly recommended starting point before building any real game",
     category: "Studio Guide",
   },
   {
     alias: "guidelines",
     wikiPage: "BGA_Studio_Guidelines",
-    description: "BGA Studio coding guidelines and best practices",
+    description:
+      "BGA Studio coding and UX/UI guidelines that games must meet for alpha/beta/release approval. " +
+      "Layout (L-1–L-8): responsive design, no horizontal scroll at standard widths, player panels always visible, " +
+      "board centred, no overlapping UI elements. " +
+      "Usability (U-1–U-8): always-visible whose-turn indicator, highlighted valid actions, " +
+      "tooltips on all interactive elements, undo support where the rules allow. " +
+      "Feedback (F-1–F-3): smooth animations for all game events, sound effects encouraged, " +
+      "game log entry for every meaningful player action. " +
+      "Design (D-1–D-4): no copyrighted/watermarked artwork, all interface text in English, " +
+      "colour-blind-friendly (never rely on colour alone to convey information). " +
+      "Accessibility (A-1–A-4): keyboard navigability, sufficient contrast ratios, " +
+      "ARIA labels on interactive elements. " +
+      "Technical (T-1–T-10): no console.log in production, no hardcoded player IDs, " +
+      "no PHP global state across requests, all DB access via BGA helpers (not raw PDO), " +
+      "no .action.php (use autowired act* State methods), PSR-4 namespacing for PHP modules, " +
+      "JS templates via jstpl_ variables (not inline HTML string concatenation)",
     category: "Studio Guide",
   },
   {
     alias: "tips",
     wikiPage: "I_wish_I_knew_this_when_I_started",
-    description: "One-liners on the most common missed features and mistakes",
+    description:
+      "One-liners on the most common missed features, gotchas, and time-saving tricks in BGA Studio. " +
+      "Cache: always Ctrl+F5 after CSS/image changes — browser cache is persistent and bites everyone. " +
+      "PHP state: no global variables survive between requests; use $this->bga->globals or DB for persistence. " +
+      "getAllDatas(): every piece of state the client needs must be returned here — " +
+      "called on page reload, spectator join, and player reconnect; gaps cause desynced UIs. " +
+      "Actions: use bgaPerformAction('actXxx', args) not legacy ajaxcall(); " +
+      "never update the UI in the action response callback — only in notif_* handlers. " +
+      "Equality: use === not == in PHP when comparing DB string values (player IDs from getObjectFromDB are strings). " +
+      "1-player mode: set players:[1] in gameinfos during development so you can test without a second browser tab. " +
+      "Reload button: after changing stats.json or gameoptions.json you MUST click Reload in Control Panel or changes are invisible. " +
+      "$this->dump('label', $var): best friend for server-side debugging — output appears directly in the game log. " +
+      "Spectator testing: always open the game in an incognito window as a spectator to catch getAllDatas gaps",
     category: "Studio Guide",
   },
   {
     alias: "debugging",
     wikiPage: "Practical_debugging",
-    description: "Practical tips for debugging PHP and JS in BGA Studio",
+    description:
+      "Practical debugging tools and techniques for BGA games in Studio. " +
+      "PHP: $this->dump('label', $variable) — dumps value to the game log visible to all players at the table. " +
+      "$this->debug('msg') — writes to the server error log (Control Panel → Show last PHP errors). " +
+      "$this->trace('msg') — lightweight flow tracing. " +
+      "Debug menu: prefix any PHP method with debug_ (e.g. debug_giveAllCards()) to expose it in Studio's debug dropdown; " +
+      "wrap the method body in if ($this->getBgaEnvironment() === 'studio') to prevent production exposure. " +
+      "getBgaEnvironment(): returns 'studio', 'preprod', or 'production' — gate all debug code behind 'studio'. " +
+      "Save & restore state: Control Panel has 'Save current game state' / 'Restore' buttons — " +
+      "invaluable for replaying a specific game scenario without replaying the whole game from scratch. " +
+      "JS: browser DevTools console + debugger; breakpoints; Network tab to inspect ajaxcall payloads and PHP responses. " +
+      "Identifying PHP errors: blank/spinner response usually means a PHP exception — check the Studio error log. " +
+      "Notification tracing: add console.log(notif) at the top of each notif_* handler during development. " +
+      "instantaneousMode: during replay, animations are skipped; guard custom animations with bgaAnimationsActive()",
     category: "Studio Guide",
   },
   {
     alias: "troubleshooting",
     wikiPage: "Troubleshooting",
-    description: "Common 'I am really stuck' situations and their solutions",
+    description:
+      "Solutions to common 'I am really stuck' situations in BGA Studio. " +
+      "Game won't start: PHP syntax error (check Studio error log), SQL error in dbmodel.sql, " +
+      "setupNewGame() not returning the first State class name, or a missing required gameinfos field. " +
+      "'Move recorded, waiting for update' (spinner never resolves): a notification was sent but the " +
+      "matching JS notif_* handler is missing, misspelled, or threw a JS error — open DevTools console. " +
+      "Zombie mode errors: zombie() method missing or failing to advance the game state — " +
+      "every active-player state needs a zombie() implementation. " +
+      "DB deadlocks: concurrent requests updating the same row — " +
+      "restructure to a single UPDATE or add SELECT ... FOR UPDATE locking. " +
+      "JS integer-as-string bugs: PHP DB integer values arrive as strings in JSON notifications — " +
+      "cast with parseInt() in JS or (int) in PHP before sending. " +
+      "'checkAction' error: action name mismatch between JS bgaPerformAction call and PHP State class method name. " +
+      "Spectator crash: getAllDatas() returning getCurrentPlayerId() data without guarding for spectator context. " +
+      "Stats/options not appearing: forgot to click 'Reload game options/informations' in Control Panel",
     category: "Studio Guide",
   },
   {
     alias: "lifecycle",
     wikiPage: "BGA_game_Lifecycle",
-    description: "BGA game lifecycle: alpha → beta → release stages",
+    description:
+      "BGA game lifecycle: the stages a game passes through from creation to full public release. " +
+      "Initial: project created in Studio, visible only to the developer. " +
+      "Assigned: a BGA project manager is assigned to shepherd the game through review. " +
+      "Pre-alpha: developer can invite specific testers via a private link for early feedback. " +
+      "Alpha: submitted for BGA review — team checks guideline compliance, UI quality, rules accuracy, and game stability. " +
+      "Licensed games also require publisher review and approval at this stage. " +
+      "Public Beta: game opens to all BGA users; ELO enabled; appears in the game catalog. " +
+      "Requires 10+ player ratings averaging ≥ 4.5 to be considered for advancement to Gold. " +
+      "Gold (Full Release): promoted to full status with higher catalog visibility. " +
+      "Key notes: do not set is_beta = 0 in gameinfos before the game is fully stabilised post-beta. " +
+      "ELO goes live at Public Beta — the formula depends on suggest_player_number in gameinfos. " +
+      "Publisher outreach: the BGA team handles contacting publishers; developers should not do this independently",
     category: "Studio Guide",
   },
   {
     alias: "faq",
     wikiPage: "Studio_FAQ",
-    description: "BGA Studio frequently asked questions",
+    description:
+      "BGA Studio frequently asked questions — quick answers to common developer queries. " +
+      "PHP version: target PHP 8.4 (strict_types, named arguments, match, enums, fibers all available). " +
+      "SFTP clients: FileZilla, WinSCP, Cyberduck, and the VS Code SFTP extension all work. " +
+      "Language requirement: all code, variable names, comments, and translatable strings must be in English. " +
+      "Image cache: img/ changes require Ctrl+F5 (hard reload) — browser cache is aggressive. " +
+      "Stats / options not appearing after edit: must click 'Reload game options configuration' or " +
+      "'Reload game informations' in Control Panel after changing stats.json, gameoptions.json, or gameinfos.inc.php. " +
+      "Testing with multiple players: use Express Start with multiple browser tabs, or set players:[1] in gameinfos for solo testing. " +
+      "npm/Composer packages: only pure-JS ESM libraries loadable via importEsmLib(); " +
+      "no server-side Composer packages — PHP uses only BGA's built-in framework. " +
+      "Payment: BGA developers are volunteers; BGA handles all publisher licensing negotiations. " +
+      "Studio access: any BGA account can access Studio at en.boardgamearena.com/studio",
     category: "Studio Guide",
   },
   {
     alias: "migration",
     wikiPage: "BGA_Studio_Migration_Guide",
     description:
-      "Migration guide for upgrading from older BGA Studio framework versions",
+      "Migration guide for upgrading an existing BGA game from the legacy framework to the modern architecture. " +
+      "File structure: move game.php → modules/php/Game.php; add PHP namespace (e.g. namespace Bga\\Games\\MyGame). " +
+      "Remove .action.php: player actions are now autowired — any public act* method on a State class is auto-exposed as an AJAX endpoint. " +
+      "State machine: replace the states.inc.php PHP array with individual State class files in modules/php/States/; " +
+      "each class extends \\Bga\\GameFramework\\States\\GameState. " +
+      "setupNewGame: return the first State class name (e.g. return PlayerTurn::class) instead of calling gamestate->changeStateLabel(). " +
+      "Client API migration — replace all legacy/Dojo calls with the new this.bga.* namespace: " +
+      "this.bga.actions.performAction (replaces ajaxcall), this.bga.notifications.setupPromiseNotifications, " +
+      "this.bga.states, this.bga.players, this.bga.statusBar, this.bga.playerPanels, " +
+      "this.bga.dialogs, this.bga.sounds, this.bga.images, this.bga.gameArea. " +
+      "PHP 7.4 → 8.4 upgrades: typed properties, constructor promotion, match expressions, named arguments, enums. " +
+      "Replace Dojo utilities with vanilla JS: dojo.place → insertAdjacentHTML, dojo.connect → addEventListener, " +
+      "dojo.query → querySelectorAll, dojo.style → element.style, dojo.addClass/removeClass → classList. " +
+      "A step-by-step migration checklist is available in the wiki",
     category: "Studio Guide",
   },
   {
     alias: "typescript",
     wikiPage: "Using_Typescript_and_Scss",
-    description: "How to use TypeScript and SCSS in BGA game development",
+    description:
+      "How to use TypeScript and SCSS (Dart Sass) in BGA game development as an optional local build step. " +
+      "Toolchain: Rollup (bundler) + TypeScript compiler + Dart Sass — all run locally; output is plain .js/.css uploaded to Studio. " +
+      "Key config files: package.json (build/watch scripts), tsconfig.json (target ESNext, moduleResolution bundler), " +
+      "rollup.config.mjs (input: modules/ts/Game.ts → output: modules/js/Game.js, external BGA globals). " +
+      "Type definitions: bga-framework.d.ts — community-maintained stubs for the BGA framework globals " +
+      "(gamedatas shape, ebg.* components, this.bga.* sub-components); reference in tsconfig.json files array. " +
+      "SFTP: add node_modules/ and dist/ to your SFTP exclude list — never upload them to Studio. " +
+      "SCSS: compile partials → single .css file before upload; mirror the same file path as your game .css. " +
+      "Watch mode: run tsc --watch + rollup --watch + sass --watch simultaneously for instant local rebuilds. " +
+      "Strict mode: enable strict:true in tsconfig — catches null/undefined issues that are painful to track down at runtime. " +
+      "Note: TypeScript is a local-only step; BGA Studio only ever sees compiled .js output. " +
+      "Source maps: useful locally for debugging; omit from Studio uploads",
     category: "Studio Guide",
   },
   {
     alias: "cookbook",
     wikiPage: "BGA_Studio_Cookbook",
-    description: "Tips for using APIs, libraries and frameworks in BGA Studio",
+    description:
+      "BGA Studio Cookbook — copy-paste recipes and patterns for common implementation scenarios. " +
+      "DOM manipulation: create divs from jstpl_ templates via format_block(), attach with placeOnObject(), " +
+      "animate with slideToObject(), remove with fadeOutAndDestroy(). " +
+      "Log formatting: bgaFormatText() for Markdown-style bold/coloured game log entries; " +
+      "addDecorator() to enrich notification args automatically across multiple notification types. " +
+      "CSS sprites: background-image + background-position for token/card artwork from a single sprite sheet; " +
+      "use background-size for zoom/resolution independence. " +
+      "Drop shadows: use box-shadow not filter:drop-shadow (Safari performance regression). " +
+      "DB patterns: euro-style resource tracking (extra columns on player table vs separate resource rows), " +
+      "card game schema with the Deck component (type/type_arg/location/location_arg), " +
+      "token placement encoded as location + location_arg. " +
+      "Multi-step client states: chain JS client states to collect multiple inputs before firing a single server action. " +
+      "Custom error handling: throw UserException in PHP for user-visible validation errors (shown inline, no stack trace). " +
+      "Cache busting: append ?v=N to JS/CSS hrefs in the template to force a reload after production deploys. " +
+      "Local storage: use window.localStorage for volatile UI preferences not worth a gamepreferences.json entry. " +
+      "Undo: undoSavepoint() / undoRestorePoint() for action-level undo support",
     category: "Studio Guide",
   },
 ];

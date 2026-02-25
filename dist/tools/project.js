@@ -1,6 +1,10 @@
 import fs from "fs";
 import path from "path";
+import { createRequire } from "module";
 import { WORKSPACE_PATH } from "../config.js";
+const require = createRequire(import.meta.url);
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require("pdf-parse");
 // ---- Game discovery -------------------------------------------------------
 /** Returns names of subdirectories that look like BGA game projects. */
 function discoverGames(workspacePath) {
@@ -140,6 +144,43 @@ export const projectTools = [
             required: [],
         },
     },
+    {
+        name: "bga_list_rulebooks",
+        description: "List rulebook files found at the root of a BGA game project directory. " +
+            "Looks for files whose name contains 'rules' (case-insensitive) with a .pdf, .txt, or .md extension.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                gameName: gameNameProp,
+                projectPath: projectPathProp,
+            },
+            required: [],
+        },
+    },
+    {
+        name: "bga_read_rulebook",
+        description: "Extract and return the text content of a rulebook file (PDF, TXT, or MD) from the root of a BGA game project. " +
+            "The file must be at the project root and contain the word 'rules' in its name. " +
+            "If no filePath is given, the rulebook is auto-detected. " +
+            "Use bga_list_rulebooks first to discover available files.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                gameName: gameNameProp,
+                projectPath: projectPathProp,
+                filePath: {
+                    type: "string",
+                    description: "Filename of the rulebook at the project root (e.g. 'rules.pdf' or 'wingspan-rules.txt'). " +
+                        "Auto-detected if omitted.",
+                },
+                maxPages: {
+                    type: "number",
+                    description: "Maximum number of pages to extract from a PDF (default: all pages).",
+                },
+            },
+            required: [],
+        },
+    },
 ];
 // ---- Handler --------------------------------------------------------------
 export async function handleProjectTool(name, args) {
@@ -169,6 +210,12 @@ export async function handleProjectTool(name, args) {
     }
     if (name === "bga_list_player_actions") {
         return listPlayerActions(resolved);
+    }
+    if (name === "bga_list_rulebooks") {
+        return listRulebooks(resolved);
+    }
+    if (name === "bga_read_rulebook") {
+        return readRulebook(resolved, args.filePath, args.maxPages);
     }
     return { content: [{ type: "text", text: `Unknown project tool: ${name}` }], isError: true };
 }
@@ -353,6 +400,127 @@ function listPlayerActions(projectPath) {
         const msg = err instanceof Error ? err.message : String(err);
         return {
             content: [{ type: "text", text: `Error listing player actions: ${msg}` }],
+            isError: true,
+        };
+    }
+}
+// ---------------------------------------------------------------------------
+// Rulebook tools
+// ---------------------------------------------------------------------------
+const RULEBOOK_EXTENSIONS = [".pdf", ".txt", ".md"];
+const RULEBOOK_MISSING_MSG = "No rulebook file found at the project root.\n\n" +
+    "Expected: a file in the **root** of the game project folder whose name contains the word **\"rules\"** " +
+    `(case-insensitive) with one of these extensions: ${RULEBOOK_EXTENSIONS.join(", ")}.\n\n` +
+    "Examples of valid filenames:\n" +
+    "  - `rules.pdf`\n" +
+    "  - `wingspan-rules.pdf`\n" +
+    "  - `rules.txt`\n" +
+    "  - `rules.md`\n\n" +
+    "Place the file at the root of the project directory and try again.";
+/**
+ * Find rulebook files at the root of the project — files whose name contains
+ * "rules" (case-insensitive) with a supported extension (.pdf, .txt, .md).
+ */
+function findRulebooks(projectPath) {
+    try {
+        return fs
+            .readdirSync(projectPath, { withFileTypes: true })
+            .filter((e) => e.isFile() &&
+            RULEBOOK_EXTENSIONS.some((ext) => e.name.toLowerCase().endsWith(ext)) &&
+            e.name.toLowerCase().includes("rules"))
+            .map((e) => e.name);
+    }
+    catch {
+        return [];
+    }
+}
+function listRulebooks(projectPath) {
+    const files = findRulebooks(projectPath);
+    if (files.length === 0) {
+        return {
+            content: [{ type: "text", text: RULEBOOK_MISSING_MSG }],
+            isError: true,
+        };
+    }
+    return {
+        content: [
+            {
+                type: "text",
+                text: `## Rulebooks found at project root\n\n` +
+                    `Pass any of these to \`bga_read_rulebook\` as the \`filePath\` argument:\n\n` +
+                    files.map((f) => `- \`${f}\``).join("\n"),
+            },
+        ],
+    };
+}
+async function readRulebook(projectPath, filePath, maxPages) {
+    try {
+        // Auto-detect if no filePath given
+        if (!filePath) {
+            const found = findRulebooks(projectPath);
+            if (found.length === 0) {
+                return { content: [{ type: "text", text: RULEBOOK_MISSING_MSG }], isError: true };
+            }
+            filePath = found[0];
+        }
+        const absPath = path.isAbsolute(filePath)
+            ? filePath
+            : path.join(projectPath, filePath);
+        if (!fs.existsSync(absPath)) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `File not found: \`${filePath}\`\n\n` + RULEBOOK_MISSING_MSG,
+                    },
+                ],
+                isError: true,
+            };
+        }
+        const ext = path.extname(filePath).toLowerCase();
+        // ── Plain text / Markdown ──────────────────────────────────────────────
+        if (ext === ".txt" || ext === ".md") {
+            const text = fs.readFileSync(absPath, "utf-8").trim();
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `## Rulebook: ${path.basename(filePath)}\n\n${text}`,
+                    },
+                ],
+            };
+        }
+        // ── PDF ───────────────────────────────────────────────────────────────
+        const buffer = fs.readFileSync(absPath);
+        const data = await pdfParse(buffer, maxPages ? { max: maxPages } : undefined);
+        const pageInfo = maxPages
+            ? ` (pages 1–${Math.min(maxPages, data.numpages)} of ${data.numpages})`
+            : ` (${data.numpages} page${data.numpages === 1 ? "" : "s"})`;
+        const text = data.text.trim();
+        if (!text) {
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `\`${filePath}\` appears to be a scanned/image-only PDF — no text could be extracted.\n\n` +
+                            `Total pages: ${data.numpages}`,
+                    },
+                ],
+            };
+        }
+        return {
+            content: [
+                {
+                    type: "text",
+                    text: `## Rulebook: ${path.basename(filePath)}${pageInfo}\n\n${text}`,
+                },
+            ],
+        };
+    }
+    catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return {
+            content: [{ type: "text", text: `Error reading rulebook: ${msg}` }],
             isError: true,
         };
     }
