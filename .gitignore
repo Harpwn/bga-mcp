@@ -1,7 +1,7 @@
 # Node
 node_modules/
 
-# Build outputs
+# Build outputs (run `npm run build` to regenerate)
 dist/
 
 # Logs
@@ -16,6 +16,9 @@ Thumbs.db
 
 # VS Code
 .vscode/
+
+# Crawled docs (auto-generated on first startup via npm run crawl)
+docs/
 
 # Misc
 *.swp

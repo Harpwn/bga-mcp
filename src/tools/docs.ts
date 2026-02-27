@@ -12,7 +12,11 @@ export const docTools: Tool[] = [
   {
     name: "bga_list_doc_pages",
     description:
-      "List all curated BGA Studio documentation pages available to fetch, grouped by category.",
+      "ALWAYS call this first when the user asks any question about BGA Studio development, " +
+      "game logic, PHP/JS APIs, state machines, notifications, deck management, scoring, or any " +
+      "BGA-specific topic — even if you think you already know the answer. " +
+      "Returns a categorised catalog of all available BGA Studio documentation pages with their aliases. " +
+      "Use the aliases with bga_get_doc_page to fetch the full authoritative content before responding.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -22,7 +26,15 @@ export const docTools: Tool[] = [
   {
     name: "bga_get_doc_page",
     description:
-      "Fetch the full content of a BGA Studio wiki page. Provide either an alias from bga_list_doc_pages or a raw wiki page name.",
+      "Fetch the full authoritative content of a BGA Studio wiki page. " +
+      "ALWAYS call this (after bga_list_doc_pages) before answering any BGA implementation question " +
+      "— do NOT rely on training knowledge alone for BGA-specific APIs, patterns, or file formats, " +
+      "as these change and your training data may be stale or incomplete. " +
+      "Provide the alias from bga_list_doc_pages (e.g. 'notifications', 'state_classes', 'deck') " +
+      "or a raw wiki page name. " +
+      "Key aliases to know: 'state_classes' (modern PHP states), 'main_game_logic' (Game.php), " +
+      "'notifications' (notify API), 'deck' (Deck component), 'debugging' (debug_ functions), " +
+      "'game_interface' (Game.js), 'bga_cards', 'bga_animations', 'bga_dice'.",
     inputSchema: {
       type: "object",
       properties: {

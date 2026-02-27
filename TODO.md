@@ -1,2 +1,0 @@
-- Finish expanding doc details for pages
-- Ability to look up game details on BGG somehow
