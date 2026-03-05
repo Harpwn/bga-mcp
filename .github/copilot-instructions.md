@@ -1,5 +1,7 @@
 # BGA MCP Server - Copilot Instructions
 
+> **IMPORTANT**: Before answering any question related to BGA game development, always use the available MCP tools to look up relevant documentation first. Do not rely solely on training knowledge — use the `docs` tools to fetch up-to-date BGA wiki content, and the `project` tools to read the local game files. Prefer tool-retrieved data over assumptions.
+
 This is a TypeScript MCP (Model Context Protocol) server for BoardGameArena (BGA) game development.
 
 ## Project Purpose
@@ -40,6 +42,7 @@ src/
 - State classes docs: https://en.doc.boardgamearena.com/State_classes:_State_directory
 
 ## Development Guidelines
+- **Always look up relevant BGA docs using the MCP tools before generating code or answering questions** — use `docs` tools for wiki lookups, `project` tools for local file context
 - Keep tools focused and well-documented
 - Return structured JSON from all tools
 - Handle errors gracefully with descriptive messages
