@@ -16,6 +16,7 @@ import { projectTools, handleProjectTool } from "./tools/project.js";
 import { migrateTools, handleMigrateTool } from "./tools/migrate.js";
 import { validateTools, handleValidateTool } from "./tools/validate.js";
 import { bggTools, handleBggTool } from "./tools/bgg.js";
+import { gameplayTools, handleGameplayTool } from "./tools/gameplay.js";
 
 const server = new Server(
   {
@@ -78,6 +79,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     ...migrateTools,
     ...validateTools,
     ...bggTools,
+    ...gameplayTools,
   ],
 }));
 
@@ -102,6 +104,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
   if (bggTools.find((t: Tool) => t.name === name)) {
     return handleBggTool(name, args ?? {});
+  }
+  if (gameplayTools.find((t: Tool) => t.name === name)) {
+    return handleGameplayTool(name, args ?? {});
   }
 
   return {
