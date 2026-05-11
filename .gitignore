@@ -35,3 +35,8 @@ test-bgg.mjs
 
 # Ignore local config
 *.local
+
+# Session data (SQLite databases and ephemeral test files)
+session/**/*.db
+session/**/*.json
+Thumbs.db

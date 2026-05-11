@@ -8,6 +8,8 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:integration": "vitest run test/integration",
     "crawl": "tsc && node dist/crawl.js",
     "inspector": "npx @modelcontextprotocol/inspector node dist/index.js"
   },
@@ -21,6 +23,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/pdf-parse": "^1.1.5",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^1.6.1"
   }
 }

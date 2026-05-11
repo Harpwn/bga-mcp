@@ -5,6 +5,59 @@ import * as path from "node:path";
 import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import { WORKSPACE_PATH } from "../config.js";
+
+// ---------------------------------------------------------------------------
+// Error codes for machine payload mode
+// ---------------------------------------------------------------------------
+
+export const ErrorCode = {
+  SESSION_NOT_FOUND: "SESSION_NOT_FOUND",
+  SESSION_STOPPED: "SESSION_STOPPED",
+  HTTP_ERROR: "HTTP_ERROR",
+  ACTION_REJECTED: "ACTION_REJECTED",
+  INVALID_REQUEST: "INVALID_REQUEST",
+} as const;
+
+export type ErrorCodeType = typeof ErrorCode[keyof typeof ErrorCode];
+
+// ---------------------------------------------------------------------------
+// Shared types for state responses
+// ---------------------------------------------------------------------------
+
+export interface StateResponse {
+  state_id?: number;
+  name?: string;
+  type?: string;
+  description?: string;
+  active_players?: number[];
+  possibleactions?: string[];
+  args?: Record<string, unknown>;
+}
+
+// ---------------------------------------------------------------------------
+// Machine payload interface for structured API responses
+// ---------------------------------------------------------------------------
+
+export interface LegalMove {
+  action: string;
+  requires_args: boolean;
+  move_count: number;
+  source: 'action_options' | 'heuristic';
+  label?: string;
+  candidates?: Array<{ args?: Record<string, unknown>; label?: string }>;
+}
+
+export interface MachinePayload {
+  success: boolean;
+  state?: StateResponse;
+  available_actions?: string[];
+  legal_moves?: Record<string, LegalMove>;
+  action_options?: Record<string, unknown>;
+  notifications?: Array<{ log_rendered?: string; type?: string; log?: string }>;
+  error?: string;
+  error_code?: ErrorCodeType;
+}
 
 // ---------------------------------------------------------------------------
 // Session registry
@@ -327,7 +380,8 @@ export const gameplayTools: Tool[] = [
     name: "bga_get_state",
     description:
       "Get the current game state for a running bga-lite session. " +
-      "Returns a structured summary: state name, whose turn it is, available actions, and the state args.",
+      "Returns a structured summary: state name, whose turn it is, available actions, and the state args. " +
+      "In 'machine' format, returns a structured payload with error codes.",
     inputSchema: {
       type: "object",
       properties: {
@@ -335,6 +389,12 @@ export const gameplayTools: Tool[] = [
           type: "string",
           description:
             "Session handle returned by bga_session_start (e.g. 'castlecombo:8091').",
+        },
+        format: {
+          type: "string",
+          enum: ["summary", "machine"],
+          description:
+            "Output format: 'summary' (default) for human-readable text, or 'machine' for structured JSON payload.",
         },
       },
       required: ["handle"],
@@ -348,7 +408,8 @@ export const gameplayTools: Tool[] = [
     description:
       "Perform a player action in a running bga-lite session. " +
       "Returns a 'what changed' summary: whether the action succeeded, rendered notifications, " +
-      "the new state, and any error message on failure.",
+      "the new state, and any error message on failure. " +
+      "In 'machine' format, returns a structured payload with error codes.",
     inputSchema: {
       type: "object",
       properties: {
@@ -368,6 +429,12 @@ export const gameplayTools: Tool[] = [
           type: "object",
           description: "Optional arguments for the action (e.g. { card_id: 42 }).",
         },
+        format: {
+          type: "string",
+          enum: ["summary", "machine"],
+          description:
+            "Output format: 'summary' (default) for human-readable text, or 'machine' for structured JSON payload.",
+        },
       },
       required: ["handle", "player_id", "action"],
     },
@@ -379,13 +446,136 @@ export const gameplayTools: Tool[] = [
     name: "bga_reset_session",
     description:
       "Reset a bga-lite session to its initial state. " +
-      "Drops and recreates the database, calls setupNewGame(), and returns the new initial state summary.",
+      "Drops and recreates the database, calls setupNewGame(), and returns the new initial state summary. " +
+      "In 'machine' format, returns a structured payload with error codes.",
     inputSchema: {
       type: "object",
       properties: {
         handle: {
           type: "string",
           description: "Session handle (e.g. 'castlecombo:8091').",
+        },
+        format: {
+          type: "string",
+          enum: ["summary", "machine"],
+          description:
+            "Output format: 'summary' (default) for human-readable text, or 'machine' for structured JSON payload.",
+        },
+      },
+      required: ["handle"],
+    },
+  },
+  // -------------------------------------------------------------------------
+  // bga_save_snapshot — task 28
+  // -------------------------------------------------------------------------
+  {
+    name: "bga_save_snapshot",
+    description:
+      "Save a snapshot of the current game session database for deterministic replay. " +
+      "Returns snapshot metadata including ID, timestamp, and current game state.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        handle: {
+          type: "string",
+          description: "Session handle (e.g. 'seaside:8091').",
+        },
+        name: {
+          type: "string",
+          description: "Optional human-readable name for the snapshot (e.g. 'before endgame').",
+        },
+        note: {
+          type: "string",
+          description: "Optional detailed note describing the snapshot context.",
+        },
+      },
+      required: ["handle"],
+    },
+  },
+  // -------------------------------------------------------------------------
+  // bga_load_snapshot — task 28
+  // -------------------------------------------------------------------------
+  {
+    name: "bga_load_snapshot",
+    description:
+      "Restore a session to a previously saved snapshot. " +
+      "Replaces the current database with the saved one and returns the restored state.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        handle: {
+          type: "string",
+          description: "Session handle (e.g. 'seaside:8091').",
+        },
+        snapshot_id: {
+          type: "string",
+          description: "Snapshot ID (e.g. '1705000000000') or name to restore.",
+        },
+      },
+      required: ["handle", "snapshot_id"],
+    },
+  },
+  // -------------------------------------------------------------------------
+  // bga_list_snapshots — task 28
+  // -------------------------------------------------------------------------
+  {
+    name: "bga_list_snapshots",
+    description:
+      "List all snapshots available for a session. " +
+      "Returns snapshot metadata including timestamps, states, and sizes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        handle: {
+          type: "string",
+          description: "Session handle (e.g. 'seaside:8091').",
+        },
+      },
+      required: ["handle"],
+    },
+  },
+  // -------------------------------------------------------------------------
+  // bga_delete_snapshot — task 28
+  // -------------------------------------------------------------------------
+  {
+    name: "bga_delete_snapshot",
+    description:
+      "Delete a saved snapshot from a session. " +
+      "Removes both the database backup and metadata.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        handle: {
+          type: "string",
+          description: "Session handle (e.g. 'seaside:8091').",
+        },
+        snapshot_id: {
+          type: "string",
+          description: "Snapshot ID (e.g. '1705000000000') or name to delete.",
+        },
+      },
+      required: ["handle", "snapshot_id"],
+    },
+  },
+  // -------------------------------------------------------------------------
+  // bga_suggest_actions — task 29
+  // -------------------------------------------------------------------------
+  {
+    name: "bga_suggest_actions",
+    description:
+      "Get ranked action suggestions for the current game state using deterministic heuristics. " +
+      "Returns available actions scored by availability, branching factor, scoring signals, and progression hints. " +
+      "This is advisory-only and never performs actions directly.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        handle: {
+          type: "string",
+          description: "Session handle (e.g. 'seaside:8091').",
+        },
+        objective: {
+          type: "string",
+          description: "Optional objective to bias action ranking (e.g. 'maximize score').",
         },
       },
       required: ["handle"],
@@ -425,6 +615,26 @@ export async function handleGameplayTool(
     return handleResetSession(args);
   }
 
+  if (name === "bga_save_snapshot") {
+    return handleSaveSnapshot(args);
+  }
+
+  if (name === "bga_load_snapshot") {
+    return handleLoadSnapshot(args);
+  }
+
+  if (name === "bga_list_snapshots") {
+    return handleListSnapshots(args);
+  }
+
+  if (name === "bga_delete_snapshot") {
+    return handleDeleteSnapshot(args);
+  }
+
+  if (name === "bga_suggest_actions") {
+    return handleSuggestActions(args);
+  }
+
   return {
     content: [{ type: "text", text: `Unknown gameplay tool: ${name}` }],
     isError: true,
@@ -444,18 +654,27 @@ async function handleSessionStart(
   const resetArg = args.reset as boolean | undefined;
 
   // 1. Resolve workspace root and game directory
-  const workspaceRoot = process.env.WORKSPACE_PATH ?? process.cwd();
-  const gameDir = path.join(workspaceRoot, game);
+  const workspaceRoot = WORKSPACE_PATH ?? process.cwd();
+  const gameDirCandidates = path.isAbsolute(game)
+    ? [game]
+    : [
+        path.join(workspaceRoot, game),
+        path.join(workspaceRoot, "..", game),
+      ];
+
+  const gameDir = gameDirCandidates.find((candidate) =>
+    fs.existsSync(path.join(candidate, "gameinfos.inc.php"))
+  );
 
   // 2. Validate game directory contains gameinfos.inc.php
-  const gameInfoPath = path.join(gameDir, "gameinfos.inc.php");
-  if (!fs.existsSync(gameInfoPath)) {
+  if (!gameDir) {
     return {
       content: [
         {
           type: "text",
-          text: `Error: Game directory '${gameDir}' does not contain gameinfos.inc.php. ` +
-            `Make sure '${game}' is a valid BGA game project directory.`,
+          text:
+            `Error: Could not resolve game directory for '${game}' with gameinfos.inc.php. ` +
+            `Checked: ${gameDirCandidates.join(", ")}`,
         },
       ],
       isError: true,
@@ -486,7 +705,26 @@ async function handleSessionStart(
   }
 
   // 5. Build CLI args for bga-lite
-  const bgaLiteBin = path.join(workspaceRoot, "bga-lite", "bin", "bga-lite.js");
+  const bgaLiteBinCandidates = [
+    path.join(workspaceRoot, "bga-lite", "bin", "bga-lite.js"),
+    path.join(workspaceRoot, "..", "bga-lite", "bin", "bga-lite.js"),
+  ];
+  const bgaLiteBin = bgaLiteBinCandidates.find((candidate) => fs.existsSync(candidate));
+
+  if (!bgaLiteBin) {
+    return {
+      content: [
+        {
+          type: "text",
+          text:
+            `Error: Could not find bga-lite CLI binary. ` +
+            `Checked: ${bgaLiteBinCandidates.join(", ")}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
   const spawnArgs: string[] = [
     bgaLiteBin,
     "--game", gameDir,
@@ -647,14 +885,18 @@ async function handleSessionStop(
 // Shared helper: format a /state response into a human-readable summary
 // ---------------------------------------------------------------------------
 
-interface StateResponse {
-  state_id?: number;
-  name?: string;
-  type?: string;
-  description?: string;
-  active_players?: number[];
-  possibleactions?: string[];
-  args?: Record<string, unknown>;
+/**
+ * bga-lite endpoints often return an envelope { success, state: {...} }.
+ * Normalize both wrapped and raw payload shapes to a plain StateResponse.
+ */
+function normalizeStatePayload(payload: unknown): StateResponse {
+  if (!payload || typeof payload !== "object") return {};
+  const asRecord = payload as Record<string, unknown>;
+  const wrapped = asRecord.state;
+  if (wrapped && typeof wrapped === "object") {
+    return wrapped as StateResponse;
+  }
+  return asRecord as StateResponse;
 }
 
 function formatStateSummary(
@@ -711,6 +953,259 @@ function buildPlayerMap(session: SessionEntry): Map<number, string> {
 }
 
 // ---------------------------------------------------------------------------
+// Machine mode response helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert a handler response to machine format if requested.
+ * For text content responses, returns wrapped in MachinePayload if format === "machine".
+ */
+function toMachinePayload(
+  format: string | undefined,
+  payload: MachinePayload
+): {
+  content: Array<{ type: string; text: string }>;
+  isError?: boolean;
+} {
+  if (format === "machine") {
+    return {
+      content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+      isError: !payload.success,
+    };
+  }
+  // For summary format, return empty/error indication (caller handles text)
+  return { content: [{ type: "text", text: "" }], isError: false };
+}
+
+/**
+ * Create an error payload in machine format.
+ */
+function errorPayload(
+  errorCode: ErrorCodeType,
+  message: string
+): MachinePayload {
+  return {
+    success: false,
+    error: message,
+    error_code: errorCode,
+  };
+}
+
+/**
+ * Extract legal moves from a game state and action_options.
+ * Returns a map keyed by action name with metadata about each move.
+ */
+function extractLegalMoves(state: StateResponse): Record<string, LegalMove> {
+  const legalMoves: Record<string, LegalMove> = {};
+  const actions = state.possibleactions ?? [];
+  const actionOptions = (state.args as Record<string, unknown>) ?? {};
+
+  for (const action of actions) {
+    const actionOption = actionOptions[action];
+    
+    if (actionOption && typeof actionOption === "object") {
+      const optObj = actionOption as Record<string, unknown>;
+      const possibleMoves = optObj.possibleMoves as Array<Record<string, unknown>> | undefined;
+      const label = optObj.label as string | undefined;
+      
+      if (possibleMoves && Array.isArray(possibleMoves)) {
+        // Action has explicit possible moves
+        legalMoves[action] = {
+          action,
+          requires_args: possibleMoves.length > 0,
+          move_count: possibleMoves.length,
+          source: "action_options",
+          label,
+          candidates: possibleMoves.map((move) => ({
+            args: move,
+            label: (move.label as string | undefined),
+          })),
+        };
+      } else if (label) {
+        // Action has metadata but no explicit moves
+        legalMoves[action] = {
+          action,
+          requires_args: true,
+          move_count: 0,
+          source: "action_options",
+          label,
+        };
+      } else {
+        // Action exists but no metadata
+        legalMoves[action] = {
+          action,
+          requires_args: false,
+          move_count: 1,
+          source: "heuristic",
+        };
+      }
+    } else {
+      // Action not found in action_options; treat as simple no-arg action
+      legalMoves[action] = {
+        action,
+        requires_args: false,
+        move_count: 1,
+        source: "heuristic",
+      };
+    }
+  }
+
+  return legalMoves;
+}
+
+/**
+ * Score and rank actions using deterministic heuristics.
+ * Returns suggestions sorted by score (descending).
+ */
+function suggestActions(
+  legalMoves: Record<string, LegalMove>,
+  objective?: string
+): ActionSuggestion[] {
+  const suggestions: ActionSuggestion[] = [];
+
+  for (const [actionName, move] of Object.entries(legalMoves)) {
+    let score = 10; // Base availability score
+    const reasons: string[] = [];
+
+    // 1. Branching factor heuristic
+    if (move.move_count === 1) {
+      score += 5;
+      reasons.push("Single mandatory move");
+    } else if (move.move_count >= 2 && move.move_count <= 3) {
+      score += 8;
+      reasons.push(`Typical choice (${move.move_count} options)`);
+    } else if (move.move_count > 3) {
+      score += 6;
+      reasons.push(`Complex decision (${move.move_count} options)`);
+    }
+
+    // 2. Check for scoring signals in action name/label
+    const combinedText = `${actionName} ${move.label ?? ""}`.toLowerCase();
+    if (combinedText.includes("score") || combinedText.includes("point")) {
+      score += 3;
+      reasons.push("Scoring opportunity detected");
+    }
+
+    // 3. Check for progression signals
+    if (
+      combinedText.includes("level") ||
+      combinedText.includes("round") ||
+      combinedText.includes("turn") ||
+      combinedText.includes("phase")
+    ) {
+      score += 2;
+      reasons.push("Progression milestone detected");
+    }
+
+    if (combinedText.includes("end") || combinedText.includes("final")) {
+      score += 1;
+      reasons.push("End-of-phase action");
+    }
+
+    // 4. Objective matching (if provided)
+    if (objective) {
+      const objectiveLower = objective.toLowerCase();
+      if (combinedText.includes(objectiveLower)) {
+        score += 5;
+        reasons.push(`Matches objective: ${objective}`);
+      }
+    }
+
+    // 5. Determine confidence based on score and move availability
+    let confidence: "high" | "medium" | "low" = "low";
+    if (score >= 20) {
+      confidence = "high";
+    } else if (score >= 15) {
+      confidence = "medium";
+    }
+
+    if (move.move_count === 1) {
+      confidence = "high"; // Forced moves are high confidence
+    }
+
+    suggestions.push({
+      action: actionName,
+      score,
+      confidence,
+      reasons,
+      legal_moves_info: move,
+    });
+  }
+
+  // Sort by score descending, then by action name for determinism
+  suggestions.sort((a, b) => b.score - a.score || a.action.localeCompare(b.action));
+
+  return suggestions;
+}
+
+// ---------------------------------------------------------------------------
+// Snapshot support (task 28)
+// ---------------------------------------------------------------------------
+
+export interface SnapshotMetadata {
+  id: string;
+  name?: string;
+  timestamp: number;
+  state_id: number;
+  state_name: string;
+  active_player?: number;
+  note?: string;
+}
+
+export interface SnapshotInfo extends SnapshotMetadata {
+  size_bytes: number;
+}
+
+// ---------------------------------------------------------------------------
+// Action suggestion support (task 29)
+// ---------------------------------------------------------------------------
+
+export interface ActionSuggestion {
+  action: string;
+  score: number;
+  confidence: "high" | "medium" | "low";
+  reasons: string[];
+  legal_moves_info: LegalMove;
+}
+
+/**
+ * Get the snapshots directory for a session.
+ * Creates the directory if it doesn't exist.
+ */
+function getSnapshotsDir(session: SessionEntry): string {
+  // Snapshots stored in process.cwd()/session/.snapshots/{game}_{port}/
+  const snapshotsDir = path.join(
+    process.cwd(),
+    "session",
+    ".snapshots",
+    `${session.game}_${session.port}`
+  );
+  
+  if (!fs.existsSync(snapshotsDir)) {
+    fs.mkdirSync(snapshotsDir, { recursive: true });
+  }
+  
+  return snapshotsDir;
+}
+
+/**
+ * Fetch the current game state to include in snapshot metadata.
+ */
+async function fetchCurrentStateForSnapshot(
+  session: SessionEntry
+): Promise<SnapshotMetadata["state_id"] | null> {
+  try {
+    const raw = await bgaLiteFetch(session.baseUrl, "/state", {
+      timeoutMs: 3000,
+    });
+    const stateResp = normalizeStatePayload(raw);
+    return stateResp.state_id ?? 0;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // bga_list_sessions implementation (task 17.4)
 // ---------------------------------------------------------------------------
 
@@ -744,9 +1239,10 @@ async function handleListSessions(): Promise<{
 
     if (session.status === "running") {
       try {
-        const stateResp = (await bgaLiteFetch(session.baseUrl, "/state", {
+        const raw = await bgaLiteFetch(session.baseUrl, "/state", {
           timeoutMs: 3000,
-        })) as StateResponse;
+        });
+        const stateResp = normalizeStatePayload(raw);
         entry.currentState = stateResp.name ?? "(unknown)";
       } catch {
         // Skip state fetch on error — session may be starting up or unresponsive
@@ -779,16 +1275,20 @@ async function handleGetState(
   args: Record<string, unknown>
 ): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
   const handle = args.handle as string;
+  const format = (args.format as string | undefined) ?? "summary";
 
   const session = sessions.get(handle);
   if (!session) {
+    const payload = errorPayload(ErrorCode.SESSION_NOT_FOUND,
+      `No session found with handle '${handle}'. Use bga_list_sessions to see active sessions.`);
+    if (format === "machine") {
+      return toMachinePayload(format, payload);
+    }
     return {
       content: [
         {
           type: "text",
-          text:
-            `Error: No session found with handle '${handle}'. ` +
-            `Use bga_list_sessions to see active sessions.`,
+          text: `Error: ${payload.error}`,
         },
       ],
       isError: true,
@@ -796,11 +1296,16 @@ async function handleGetState(
   }
 
   if (session.status === "stopped") {
+    const payload = errorPayload(ErrorCode.SESSION_STOPPED,
+      `Session '${handle}' has stopped. Start a new session with bga_session_start.`);
+    if (format === "machine") {
+      return toMachinePayload(format, payload);
+    }
     return {
       content: [
         {
           type: "text",
-          text: `Error: Session '${handle}' has stopped. Start a new session with bga_session_start.`,
+          text: `Error: ${payload.error}`,
         },
       ],
       isError: true,
@@ -809,17 +1314,33 @@ async function handleGetState(
 
   let stateResp: StateResponse;
   try {
-    stateResp = (await bgaLiteFetch(session.baseUrl, "/state")) as StateResponse;
+    const raw = await bgaLiteFetch(session.baseUrl, "/state");
+    stateResp = normalizeStatePayload(raw);
   } catch (err) {
+    const payload = errorPayload(ErrorCode.HTTP_ERROR,
+      `Error fetching state from session '${handle}': ${(err as Error).message}`);
+    if (format === "machine") {
+      return toMachinePayload(format, payload);
+    }
     return {
       content: [
         {
           type: "text",
-          text: `Error fetching state from session '${handle}': ${(err as Error).message}`,
+          text: `Error: ${payload.error}`,
         },
       ],
       isError: true,
     };
+  }
+
+  if (format === "machine") {
+    const payload: MachinePayload = {
+      success: true,
+      state: stateResp,
+      available_actions: stateResp.possibleactions,
+      legal_moves: extractLegalMoves(stateResp),
+    };
+    return toMachinePayload(format, payload);
   }
 
   const playerMap = buildPlayerMap(session);
@@ -841,16 +1362,20 @@ async function handlePerformAction(
   const playerId = args.player_id as number;
   const action = args.action as string;
   const actionArgs = (args.args as Record<string, unknown> | undefined) ?? {};
+  const format = (args.format as string | undefined) ?? "summary";
 
   const session = sessions.get(handle);
   if (!session) {
+    const payload = errorPayload(ErrorCode.SESSION_NOT_FOUND,
+      `No session found with handle '${handle}'. Use bga_list_sessions to see active sessions.`);
+    if (format === "machine") {
+      return toMachinePayload(format, payload);
+    }
     return {
       content: [
         {
           type: "text",
-          text:
-            `Error: No session found with handle '${handle}'. ` +
-            `Use bga_list_sessions to see active sessions.`,
+          text: `Error: ${payload.error}`,
         },
       ],
       isError: true,
@@ -858,11 +1383,16 @@ async function handlePerformAction(
   }
 
   if (session.status === "stopped") {
+    const payload = errorPayload(ErrorCode.SESSION_STOPPED,
+      `Session '${handle}' has stopped. Start a new session with bga_session_start.`);
+    if (format === "machine") {
+      return toMachinePayload(format, payload);
+    }
     return {
       content: [
         {
           type: "text",
-          text: `Error: Session '${handle}' has stopped. Start a new session with bga_session_start.`,
+          text: `Error: ${payload.error}`,
         },
       ],
       isError: true,
@@ -884,11 +1414,16 @@ async function handlePerformAction(
       body: JSON.stringify({ player_id: playerId, action, args: actionArgs }),
     })) as ActionResponse;
   } catch (err) {
+    const payload = errorPayload(ErrorCode.HTTP_ERROR,
+      `Error performing action '${action}' in session '${handle}': ${(err as Error).message}`);
+    if (format === "machine") {
+      return toMachinePayload(format, payload);
+    }
     return {
       content: [
         {
           type: "text",
-          text: `Error performing action '${action}' in session '${handle}': ${(err as Error).message}`,
+          text: `Error: ${payload.error}`,
         },
       ],
       isError: true,
@@ -898,6 +1433,16 @@ async function handlePerformAction(
   const playerMap = buildPlayerMap(session);
 
   if (!actionResp.success) {
+    const payload: MachinePayload = {
+      success: false,
+      error: actionResp.error ?? "Action rejected",
+      error_code: ErrorCode.ACTION_REJECTED,
+      available_actions: actionResp.available_actions,
+      legal_moves: actionResp.state ? extractLegalMoves(actionResp.state) : undefined,
+    };
+    if (format === "machine") {
+      return toMachinePayload(format, payload);
+    }
     const availableActions = actionResp.available_actions ?? [];
     const lines: string[] = [
       `Action failed: ${actionResp.error ?? "Unknown error"}`,
@@ -911,11 +1456,22 @@ async function handlePerformAction(
     };
   }
 
-  // Extract log_rendered strings from notifications as the "changes" array
+  // Extract log_rendered strings from notifications
   const notifications = actionResp.notifications ?? [];
   const changes = notifications
     .map((n) => n.log_rendered)
     .filter((s): s is string => typeof s === "string" && s.trim().length > 0);
+
+  if (format === "machine") {
+    const payload: MachinePayload = {
+      success: true,
+      state: actionResp.state,
+      available_actions: actionResp.available_actions,
+      legal_moves: actionResp.state ? extractLegalMoves(actionResp.state) : undefined,
+      notifications: actionResp.notifications,
+    };
+    return toMachinePayload(format, payload);
+  }
 
   const newState = actionResp.state;
   const lines: string[] = ["Action succeeded."];
@@ -945,6 +1501,100 @@ async function handleResetSession(
   args: Record<string, unknown>
 ): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
   const handle = args.handle as string;
+  const format = (args.format as string | undefined) ?? "summary";
+
+  const session = sessions.get(handle);
+  if (!session) {
+    const payload = errorPayload(ErrorCode.SESSION_NOT_FOUND,
+      `No session found with handle '${handle}'. Use bga_list_sessions to see active sessions.`);
+    if (format === "machine") {
+      return toMachinePayload(format, payload);
+    }
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error: ${payload.error}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  if (session.status === "stopped") {
+    const payload = errorPayload(ErrorCode.SESSION_STOPPED,
+      `Session '${handle}' has stopped. Start a new session with bga_session_start.`);
+    if (format === "machine") {
+      return toMachinePayload(format, payload);
+    }
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error: ${payload.error}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  let resetResp: StateResponse;
+  try {
+    const raw = await bgaLiteFetch(session.baseUrl, "/reset", {
+      method: "POST",
+      body: "{}",
+    });
+    resetResp = normalizeStatePayload(raw);
+  } catch (err) {
+    const payload = errorPayload(ErrorCode.HTTP_ERROR,
+      `Error resetting session '${handle}': ${(err as Error).message}`);
+    if (format === "machine") {
+      return toMachinePayload(format, payload);
+    }
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error: ${payload.error}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  if (format === "machine") {
+    const payload: MachinePayload = {
+      success: true,
+      state: resetResp,
+      available_actions: resetResp.possibleactions,
+      legal_moves: extractLegalMoves(resetResp),
+    };
+    return toMachinePayload(format, payload);
+  }
+
+  const playerMap = buildPlayerMap(session);
+  const summary = formatStateSummary(resetResp, playerMap);
+
+  return {
+    content: [
+      {
+        type: "text",
+        text: `Session '${handle}' reset successfully.\n\n${summary}`,
+      },
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// bga_save_snapshot implementation (task 28)
+// ---------------------------------------------------------------------------
+
+async function handleSaveSnapshot(
+  args: Record<string, unknown>
+): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
+  const handle = args.handle as string;
+  const name = (args.name as string | undefined);
+  const note = (args.note as string | undefined);
 
   const session = sessions.get(handle);
   if (!session) {
@@ -952,9 +1602,7 @@ async function handleResetSession(
       content: [
         {
           type: "text",
-          text:
-            `Error: No session found with handle '${handle}'. ` +
-            `Use bga_list_sessions to see active sessions.`,
+          text: `Error: No session found with handle '${handle}'.`,
         },
       ],
       isError: true,
@@ -966,42 +1614,461 @@ async function handleResetSession(
       content: [
         {
           type: "text",
-          text: `Error: Session '${handle}' has stopped. Start a new session with bga_session_start.`,
+          text: `Error: Session '${handle}' has stopped.`,
         },
       ],
       isError: true,
     };
   }
 
-  let resetResp: StateResponse;
   try {
-    resetResp = (await bgaLiteFetch(session.baseUrl, "/reset", {
-      method: "POST",
-      body: "{}",
-    })) as StateResponse;
+    // Get current state for metadata
+    const stateId = await fetchCurrentStateForSnapshot(session) ?? 0;
+    
+    // Create snapshot ID from timestamp
+    const snapshotId = Date.now().toString();
+    
+    // Get snapshots directory
+    const snapshotsDir = getSnapshotsDir(session);
+    const dbCopyPath = path.join(snapshotsDir, `${snapshotId}.db`);
+    const metadataPath = path.join(snapshotsDir, `${snapshotId}.json`);
+
+    // Copy database file
+    // We need to get the database path - it's typically session/{gameName}.db
+    const dbPath = path.join(process.cwd(), "session", `${session.game}.db`);
+    if (!fs.existsSync(dbPath)) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error: Database file not found at ${dbPath}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    fs.copyFileSync(dbPath, dbCopyPath);
+
+    // Write metadata
+    const metadata: SnapshotMetadata = {
+      id: snapshotId,
+      name,
+      timestamp: Date.now(),
+      state_id: stateId,
+      state_name: "(fetching...)",
+      note,
+    };
+
+    fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+
+    return {
+      content: [
+        {
+          type: "text",
+          text:
+            `Snapshot saved successfully.\n` +
+            `ID: ${snapshotId}\n` +
+            `Name: ${name ?? "(unnamed)"}\n` +
+            `State ID: ${stateId}\n` +
+            `Size: ${(fs.statSync(dbCopyPath).size / 1024).toFixed(2)} KB`,
+        },
+      ],
+    };
   } catch (err) {
     return {
       content: [
         {
           type: "text",
-          text: `Error resetting session '${handle}': ${(err as Error).message}`,
+          text: `Error saving snapshot: ${(err as Error).message}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// bga_load_snapshot implementation (task 28)
+// ---------------------------------------------------------------------------
+
+async function handleLoadSnapshot(
+  args: Record<string, unknown>
+): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
+  const handle = args.handle as string;
+  const snapshotId = args.snapshot_id as string;
+
+  const session = sessions.get(handle);
+  if (!session) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error: No session found with handle '${handle}'.`,
         },
       ],
       isError: true,
     };
   }
 
-  const playerMap = buildPlayerMap(session);
+  if (session.status === "stopped") {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error: Session '${handle}' has stopped.`,
+        },
+      ],
+      isError: true,
+    };
+  }
 
-  // The /reset endpoint returns the initial state — format it the same way as bga_get_state
-  const summary = formatStateSummary(resetResp, playerMap);
+  try {
+    const snapshotsDir = getSnapshotsDir(session);
+    
+    // Try to find snapshot by ID or name
+    let foundId = snapshotId;
+    let dbCopyPath = path.join(snapshotsDir, `${snapshotId}.db`);
+    
+    if (!fs.existsSync(dbCopyPath)) {
+      // Try to find by name
+      const files = fs.readdirSync(snapshotsDir);
+      const matching = files
+        .filter((f) => f.endsWith(".json"))
+        .map((f) => ({
+          id: f.replace(".json", ""),
+          path: path.join(snapshotsDir, f),
+        }))
+        .find((m) => {
+          const meta = JSON.parse(fs.readFileSync(m.path, "utf8"));
+          return meta.name === snapshotId;
+        });
+      
+      if (matching) {
+        foundId = matching.id;
+        dbCopyPath = path.join(snapshotsDir, `${foundId}.db`);
+      } else {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error: Snapshot '${snapshotId}' not found.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // Restore database
+    const dbPath = path.join(process.cwd(), "session", `${session.game}.db`);
+    fs.copyFileSync(dbCopyPath, dbPath);
+
+    // Fetch new state after restoration
+    const stateId = await fetchCurrentStateForSnapshot(session) ?? 0;
+
+    return {
+      content: [
+        {
+          type: "text",
+          text:
+            `Snapshot restored successfully.\n` +
+            `Snapshot ID: ${foundId}\n` +
+            `Current State ID: ${stateId}`,
+        },
+      ],
+    };
+  } catch (err) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error loading snapshot: ${(err as Error).message}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// bga_list_snapshots implementation (task 28)
+// ---------------------------------------------------------------------------
+
+async function handleListSnapshots(
+  args: Record<string, unknown>
+): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
+  const handle = args.handle as string;
+
+  const session = sessions.get(handle);
+  if (!session) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error: No session found with handle '${handle}'.`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  try {
+    const snapshotsDir = getSnapshotsDir(session);
+    const files = fs.readdirSync(snapshotsDir);
+    const snapshots: SnapshotInfo[] = [];
+
+    for (const file of files) {
+      if (file.endsWith(".json")) {
+        const metadataPath = path.join(snapshotsDir, file);
+        const metadata = JSON.parse(
+          fs.readFileSync(metadataPath, "utf8")
+        ) as SnapshotMetadata;
+
+        const dbPath = path.join(snapshotsDir, `${metadata.id}.db`);
+        const size_bytes = fs.existsSync(dbPath)
+          ? fs.statSync(dbPath).size
+          : 0;
+
+        snapshots.push({
+          ...metadata,
+          size_bytes,
+        });
+      }
+    }
+
+    // Sort by timestamp descending
+    snapshots.sort((a, b) => b.timestamp - a.timestamp);
+
+    if (snapshots.length === 0) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `No snapshots found for session '${handle}'.`,
+          },
+        ],
+      };
+    }
+
+    const lines: string[] = [`Snapshots for ${handle} (${snapshots.length}):`];
+    for (const snap of snapshots) {
+      const date = new Date(snap.timestamp).toISOString();
+      const sizeKb = (snap.size_bytes / 1024).toFixed(2);
+      const nameStr = snap.name ? ` — ${snap.name}` : "";
+      lines.push(
+        `  • ID: ${snap.id}${nameStr}\n` +
+        `    State: ${snap.state_name} (ID: ${snap.state_id}), Size: ${sizeKb} KB, Created: ${date}`
+      );
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: lines.join("\n"),
+        },
+      ],
+    };
+  } catch (err) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error listing snapshots: ${(err as Error).message}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// bga_delete_snapshot implementation (task 28)
+// ---------------------------------------------------------------------------
+
+async function handleDeleteSnapshot(
+  args: Record<string, unknown>
+): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
+  const handle = args.handle as string;
+  const snapshotId = args.snapshot_id as string;
+
+  const session = sessions.get(handle);
+  if (!session) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error: No session found with handle '${handle}'.`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  try {
+    const snapshotsDir = getSnapshotsDir(session);
+    
+    // Try to find snapshot by ID or name
+    let foundId = snapshotId;
+    let dbPath = path.join(snapshotsDir, `${snapshotId}.db`);
+    let metadataPath = path.join(snapshotsDir, `${snapshotId}.json`);
+
+    if (!fs.existsSync(metadataPath)) {
+      // Try to find by name
+      const files = fs.readdirSync(snapshotsDir);
+      const matching = files
+        .filter((f) => f.endsWith(".json"))
+        .map((f) => ({
+          id: f.replace(".json", ""),
+          path: path.join(snapshotsDir, f),
+        }))
+        .find((m) => {
+          const meta = JSON.parse(fs.readFileSync(m.path, "utf8"));
+          return meta.name === snapshotId;
+        });
+
+      if (matching) {
+        foundId = matching.id;
+        dbPath = path.join(snapshotsDir, `${foundId}.db`);
+        metadataPath = path.join(snapshotsDir, `${foundId}.json`);
+      } else {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error: Snapshot '${snapshotId}' not found.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+
+    // Delete both database and metadata files
+    if (fs.existsSync(dbPath)) {
+      fs.unlinkSync(dbPath);
+    }
+    if (fs.existsSync(metadataPath)) {
+      fs.unlinkSync(metadataPath);
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Snapshot '${foundId}' deleted successfully.`,
+        },
+      ],
+    };
+  } catch (err) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error deleting snapshot: ${(err as Error).message}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// bga_suggest_actions implementation (task 29)
+// ---------------------------------------------------------------------------
+
+async function handleSuggestActions(
+  args: Record<string, unknown>
+): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
+  const handle = args.handle as string;
+  const objective = (args.objective as string | undefined);
+
+  const session = sessions.get(handle);
+  if (!session) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error: No session found with handle '${handle}'.`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  if (session.status === "stopped") {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error: Session '${handle}' has stopped.`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  let stateResp: StateResponse;
+  try {
+    const raw = await bgaLiteFetch(session.baseUrl, "/state");
+    stateResp = normalizeStatePayload(raw);
+  } catch (err) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Error fetching state from session '${handle}': ${(err as Error).message}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  // Extract legal moves and generate suggestions
+  const legalMoves = extractLegalMoves(stateResp);
+  const suggestions = suggestActions(legalMoves, objective);
+
+  if (suggestions.length === 0) {
+    return {
+      content: [
+        {
+          type: "text",
+          text: `No actions available for session '${handle}'.`,
+        },
+      ],
+    };
+  }
+
+  // Format suggestions for human-readable output
+  const lines: string[] = [
+    `Action Suggestions for ${handle}${objective ? ` (objective: ${objective})` : ""}:`,
+    "",
+  ];
+
+  for (let i = 0; i < suggestions.length; i++) {
+    const sugg = suggestions[i];
+    const rank = i + 1;
+    lines.push(
+      `${rank}. ${sugg.action} (score: ${sugg.score}, confidence: ${sugg.confidence})`
+    );
+
+    if (sugg.legal_moves_info.label) {
+      lines.push(`   Label: ${sugg.legal_moves_info.label}`);
+    }
+
+    lines.push(`   Reasons: ${sugg.reasons.join("; ")}`);
+
+    if (sugg.legal_moves_info.move_count > 0) {
+      lines.push(`   Options: ${sugg.legal_moves_info.move_count}`);
+    }
+
+    if (i < suggestions.length - 1) {
+      lines.push("");
+    }
+  }
 
   return {
-    content: [
-      {
-        type: "text",
-        text: `Session '${handle}' reset successfully.\n\n${summary}`,
-      },
-    ],
+    content: [{ type: "text", text: lines.join("\n") }],
   };
 }
