@@ -16,7 +16,8 @@ import { projectTools, handleProjectTool } from "./tools/project.js";
 import { migrateTools, handleMigrateTool } from "./tools/migrate.js";
 import { validateTools, handleValidateTool } from "./tools/validate.js";
 import { bggTools, handleBggTool } from "./tools/bgg.js";
-import { gameplayTools, handleGameplayTool } from "./tools/gameplay.js";
+import { liteSpecTools, handleLiteSpecTool } from "./tools/lite-specs.js";
+import { liteRuntimeTools, handleLiteRuntimeTool } from "./tools/lite-runtime.js";
 
 const server = new Server(
   {
@@ -79,7 +80,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     ...migrateTools,
     ...validateTools,
     ...bggTools,
-    ...gameplayTools,
+    ...liteSpecTools,
+    ...liteRuntimeTools,
   ],
 }));
 
@@ -105,8 +107,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (bggTools.find((t: Tool) => t.name === name)) {
     return handleBggTool(name, args ?? {});
   }
-  if (gameplayTools.find((t: Tool) => t.name === name)) {
-    return handleGameplayTool(name, args ?? {});
+  if (liteSpecTools.find((t: Tool) => t.name === name)) {
+    return handleLiteSpecTool(name, args ?? {});
+  }
+  if (liteRuntimeTools.find((t: Tool) => t.name === name)) {
+    return handleLiteRuntimeTool(name, args ?? {});
   }
 
   return {

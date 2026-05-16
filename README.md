@@ -11,6 +11,8 @@ A [Model Context Protocol](https://modelcontextprotocol.io/) server that gives A
 | **Validation** | Lint a project for broken transitions, missing zombie(), JS↔PHP action mismatches, and more |
 | **Migration** | Scan projects for deprecated patterns, convert states.inc.php, migration guide |
 | **Local Project** | List files, read files, analyze states.inc.php, list player actions |
+| **BGA Lite Specs** | Read and analyze bga-lite spec files to drive runtime/MCP alignment |
+| **BGA Lite Runtime** | Thin MCP wrappers over bga-lite Runtime and RuntimeSession methods |
 
 ## Prerequisites
 
@@ -71,6 +73,25 @@ npm run inspector
 - **`bga_analyze_game_states`** – Parse and summarize `states.inc.php`
 - **`bga_list_player_actions`** – List PHP action methods in the main game class
 
+### BGA Lite Specs
+- **`bga_lite_list_specs`** – List available files from `bga-lite/specs` with quick metadata
+- **`bga_lite_get_spec`** – Read the full content of a specific spec file
+- **`bga_lite_runtime_contract`** – Extract Runtime and RuntimeSession method contracts from `runtime-api.md`
+- **`bga_lite_mcp_adapter_blueprint`** – Build a spec-aligned MCP adapter checklist and recommended tool surface
+
+### BGA Lite Runtime
+- **`bga_runtime_create_session`** – Create a runtime session (`scenario` or `debug`) via `runtime.createSession`
+- **`bga_runtime_load_session`** – Load an existing runtime session via `runtime.loadSession`
+- **`bga_runtime_list_sessions`** – List active runtime sessions via `runtime.listSessions`
+- **`bga_session_get_state`** – Fetch current state via `session.getState`
+- **`bga_session_get_players`** – Fetch player slots via `session.getPlayers`
+- **`bga_session_get_gamedatas`** – Fetch game data payload via `session.getGameDatas`
+- **`bga_session_perform_action`** – Execute an action via `session.performAction` with structured step result
+- **`bga_session_reset`** – Reset session via `session.resetSession`
+- **`bga_session_timeline`** – Fetch timeline entries via `session.getEventTimeline`
+- **`bga_session_warnings`** – Fetch warning records via `session.getWarnings`
+- **`bga_session_close`** – Close and remove a session via `runtime.closeSession`
+
 ## Environment Variables
 
 | Variable | Purpose |
@@ -89,6 +110,8 @@ src/
     validate.ts     Project linting / validation
     migrate.ts      Migration tools (legacy → State classes)
     project.ts      Local game project file tools
+    lite-specs.ts   bga-lite spec analysis and MCP adapter planning tools
+    lite-runtime.ts bga-lite Runtime API adapter tools
 ```
 
 ## Development
