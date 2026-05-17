@@ -18,6 +18,7 @@ import { validateTools, handleValidateTool } from "./tools/validate.js";
 import { bggTools, handleBggTool } from "./tools/bgg.js";
 import { liteSpecTools, handleLiteSpecTool } from "./tools/lite-specs.js";
 import { liteRuntimeTools, handleLiteRuntimeTool } from "./tools/lite-runtime.js";
+import { testStubTools, handleTestStubTool } from "./tools/test-stubs.js";
 
 const server = new Server(
   {
@@ -82,6 +83,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     ...bggTools,
     ...liteSpecTools,
     ...liteRuntimeTools,
+    ...testStubTools,
   ],
 }));
 
@@ -112,6 +114,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
   if (liteRuntimeTools.find((t: Tool) => t.name === name)) {
     return handleLiteRuntimeTool(name, args ?? {});
+  }
+  if (testStubTools.find((t: Tool) => t.name === name)) {
+    return handleTestStubTool(name, args ?? {});
   }
 
   return {
