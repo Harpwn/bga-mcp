@@ -55,6 +55,7 @@ npm run inspector
 - **`bga_generate_state_action`** – Generate an `#[PossibleAction]` method stub to add inside a State class
 - **`bga_generate_notification`** – Generate PHP (backend) + JS (frontend) notification stubs using `bgaSetupPromiseNotifications`
 - **`bga_scaffold_game`** – Generate a complete BGA game skeleton using the modern State classes approach
+- **`bga_scaffold_seed_catalog`** – Scaffold the full testing setup in one command: `vitest.config.ts`, `.vscode/settings.json`, a helper file when missing, and the standardized seed-catalog harness (`seed-catalog.ts`, `scan-seeds.ts`, `verify-catalog.ts`, `seed-catalog.json`) backed by shared `bga-lite` seed-catalog + CLI helpers
 
 ### Validation
 - **`bga_validate_project`** – Lint a project for common bugs and inconsistencies:
